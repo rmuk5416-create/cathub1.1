@@ -1,0 +1,527 @@
+-- [[ MM2 Cat Hub + Gun Puller Floating Button (Fixed Gun Detection) ]] --
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-- ป้องกันเปิด UI ซ้ำ
+if CoreGui:FindFirstChild("MM2_CatHub") then
+    CoreGui.MM2_CatHub:Destroy()
+end
+
+-- 1. สร้าง ScreenGui หลัก
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "MM2_CatHub"
+ScreenGui.Parent = CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- 2. ปุ่มไอคอนลอยด้านนอก (Floating Icon)
+local CatButton = Instance.new("ImageButton")
+CatButton.Name = "CatButton"
+CatButton.Size = UDim2.new(0, 50, 0, 50)
+CatButton.Position = UDim2.new(0, 30, 0.5, -25)
+CatButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+CatButton.BorderSizePixel = 0
+CatButton.Draggable = true
+CatButton.Image = "rbxassetid://95950186817009"
+CatButton.Parent = ScreenGui
+
+local CatCorner = Instance.new("UICorner")
+CatCorner.CornerRadius = UDim.new(1, 0)
+CatCorner.Parent = CatButton
+
+-- 3. หน้าต่างหลัก (Main Frame)
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 480, 0, 420)
+MainFrame.Position = UDim2.new(0.5, -240, 0.5, -210)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Visible = false
+MainFrame.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = MainFrame
+
+-- หน้าต่างตั้งค่า (เปิดด้วยการกดค้างปุ่มลอย 3-4 วินาที)
+local SettingsFrame = Instance.new("Frame")
+SettingsFrame.Name = "SettingsFrame"
+SettingsFrame.Size = UDim2.new(0, 480, 0, 320)
+SettingsFrame.Position = UDim2.new(0.5, -240, 0.5, -160)
+SettingsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+SettingsFrame.BorderSizePixel = 0
+SettingsFrame.Active = true
+SettingsFrame.Draggable = true
+SettingsFrame.Visible = false
+SettingsFrame.Parent = ScreenGui
+
+local SettingsCorner = Instance.new("UICorner")
+SettingsCorner.CornerRadius = UDim.new(0, 10)
+SettingsCorner.Parent = SettingsFrame
+
+local SettingsTitle = Instance.new("TextLabel")
+SettingsTitle.Size = UDim2.new(1, -20, 0, 40)
+SettingsTitle.Position = UDim2.new(0, 15, 0, 10)
+SettingsTitle.BackgroundTransparency = 1
+SettingsTitle.Text = "⚙️ เมนูตั้งค่าระบบ"
+SettingsTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+SettingsTitle.TextSize = 16
+SettingsTitle.Font = Enum.Font.GothamBold
+SettingsTitle.TextXAlignment = Enum.TextXAlignment.Left
+SettingsTitle.Parent = SettingsFrame
+
+local CloseSettings = Instance.new("TextButton")
+CloseSettings.Size = UDim2.new(0, 28, 0, 28)
+CloseSettings.Position = UDim2.new(1, -38, 0, 15)
+CloseSettings.BackgroundColor3 = Color3.fromRGB(230, 50, 50)
+CloseSettings.Text = "X"
+CloseSettings.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseSettings.TextSize = 12
+CloseSettings.Font = Enum.Font.GothamBold
+CloseSettings.Parent = SettingsFrame
+
+local CloseSettingsCorner = Instance.new("UICorner")
+CloseSettingsCorner.CornerRadius = UDim.new(0, 6)
+CloseSettingsCorner.Parent = CloseSettings
+
+CloseSettings.MouseButton1Click:Connect(function()
+    SettingsFrame.Visible = false
+end)
+
+-- ระบบกดคลิกปกติ VS กดค้าง 3-4 วินาที
+local holdTimer = 0
+local isHolding = false
+local holdDuration = 3.5
+
+CatButton.MouseButton1Down:Connect(function()
+    isHolding = true
+    holdTimer = 0
+    task.spawn(function()
+        while isHolding do
+            holdTimer = holdTimer + 0.1
+            if holdTimer >= holdDuration then
+                isHolding = false
+                SettingsFrame.Visible = true
+                MainFrame.Visible = false
+                break
+            end
+            task.wait(0.1)
+        end
+    end)
+end)
+
+CatButton.MouseButton1Up:Connect(function()
+    if isHolding then
+        isHolding = false
+        if holdTimer < holdDuration then
+            MainFrame.Visible = not MainFrame.Visible
+            SettingsFrame.Visible = false
+        end
+    end
+end)
+
+-- 4. แถบหัวข้อด้านบน (Top Bar)
+local TopBar = Instance.new("Frame")
+TopBar.Name = "TopBar"
+TopBar.Size = UDim2.new(1, 0, 0, 40)
+TopBar.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = MainFrame
+
+local TopBarCorner = Instance.new("UICorner")
+TopBarCorner.CornerRadius = UDim.new(0, 10)
+TopBarCorner.Parent = TopBar
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(0, 250, 1, 0)
+TitleLabel.Position = UDim2.new(0, 15, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "MM2 Cat Hub <font color='#00AAFF'>v2.2</font>"
+TitleLabel.RichText = true
+TitleLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
+TitleLabel.TextSize = 15
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = TopBar
+
+local ButtonContainer = Instance.new("Frame")
+ButtonContainer.Size = UDim2.new(0, 70, 1, 0)
+ButtonContainer.Position = UDim2.new(1, -75, 0, 0)
+ButtonContainer.BackgroundTransparency = 1
+ButtonContainer.Parent = TopBar
+
+local UIListLayoutTop = Instance.new("UIListLayout")
+UIListLayoutTop.FillDirection = Enum.FillDirection.Horizontal
+UIListLayoutTop.HorizontalAlignment = Enum.HorizontalAlignment.Right
+UIListLayoutTop.VerticalAlignment = Enum.VerticalAlignment.Center
+UIListLayoutTop.Padding = UDim.new(0, 5)
+UIListLayoutTop.Parent = ButtonContainer
+
+local MinimizeButton = Instance.new("TextButton")
+MinimizeButton.Size = UDim2.new(0, 28, 0, 28)
+MinimizeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+MinimizeButton.Text = "-"
+MinimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeButton.TextSize = 16
+MinimizeButton.Font = Enum.Font.GothamBold
+MinimizeButton.Parent = ButtonContainer
+
+local MinCorner = Instance.new("UICorner")
+MinCorner.CornerRadius = UDim.new(0, 6)
+MinCorner.Parent = MinimizeButton
+
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 28, 0, 28)
+CloseButton.BackgroundColor3 = Color3.fromRGB(230, 50, 50)
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.TextSize = 12
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.Parent = ButtonContainer
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 6)
+CloseCorner.Parent = CloseButton
+
+-- 5. พื้นที่แสดงเนื้อหาฟังก์ชันด้านใน
+local Container = Instance.new("ScrollingFrame")
+Container.Name = "Container"
+Container.Size = UDim2.new(1, -20, 1, -55)
+Container.Position = UDim2.new(0, 10, 0, 48)
+Container.BackgroundTransparency = 1
+Container.BorderSizePixel = 0
+Container.CanvasSize = UDim2.new(0, 0, 0, 0)
+Container.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Container.ScrollBarThickness = 4
+Container.Parent = MainFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 8)
+UIListLayout.Parent = Container
+
+local isMinimized = false
+MinimizeButton.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    Container.Visible = not isMinimized
+    if isMinimized then
+        MainFrame.Size = UDim2.new(0, 480, 0, 40)
+        MinimizeButton.Text = "+"
+    else
+        MainFrame.Size = UDim2.new(0, 480, 0, 420)
+        MinimizeButton.Text = "-"
+    end
+end)
+
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- Helper Functions สำหรับสร้าง UI
+local function createToggle(text, defaultState, callback)
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(1, 0, 0, 48)
+    Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+    Frame.BorderSizePixel = 0
+    Frame.Parent = Container
+    Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 8)
+
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(0, 320, 1, 0)
+    Label.Position = UDim2.new(0, 15, 0, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = text
+    Label.TextColor3 = Color3.fromRGB(220, 220, 220)
+    Label.TextSize = 14
+    Label.Font = Enum.Font.GothamMedium
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = Frame
+
+    local Button = Instance.new("TextButton")
+    Button.Size = UDim2.new(0, 50, 0, 24)
+    Button.Position = UDim2.new(1, -65, 0.5, -12)
+    Button.BackgroundColor3 = defaultState and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(60, 60, 70)
+    Button.Text = ""
+    Button.Parent = Frame
+    Instance.new("UICorner", Button).CornerRadius = UDim.new(1, 0)
+
+    local Circle = Instance.new("Frame")
+    Circle.Size = UDim2.new(0, 18, 0, 18)
+    Circle.Position = defaultState and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
+    Circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    Circle.Parent = Button
+    Instance.new("UICorner", Circle).CornerRadius = UDim.new(1, 0)
+
+    local toggled = defaultState
+    Button.MouseButton1Click:Connect(function()
+        toggled = not toggled
+        if toggled then
+            TweenService:Create(Button, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 170, 255)}):Play()
+            TweenService:Create(Circle, TweenInfo.new(0.2), {Position = UDim2.new(1, -21, 0.5, -9)}):Play()
+        else
+            TweenService:Create(Button, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60, 60, 70)}):Play()
+            TweenService:Create(Circle, TweenInfo.new(0.2), {Position = UDim2.new(0, 3, 0.5, -9)}):Play()
+        end
+        callback(toggled)
+    end)
+end
+
+-- ระบบฟังก์ชันหลัก (Role Viewer, ESP, เป้าเล็ง และ Movement)
+local function GetBestTarget()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            local bp = p:FindFirstChild("Backpack")
+            local char = p.Character
+            if (bp and bp:FindFirstChild("Knife")) or (char and char:FindFirstChild("Knife")) then
+                return char
+            end
+        end
+    end
+    return nil
+end
+
+createToggle("Role Viewer (ดูบทบาททั้งหมด)", false, function(v)
+    if v then pcall(function() loadstring(game:HttpGet("https://pastefy.app/gu6kzQzQ/raw"))() end) end
+end)
+
+createToggle("Role Viewer 2D (ดูบทบาทแบบ 2 มิติ)", false, function(v)
+    if v then pcall(function() loadstring(game:HttpGet("https://pastefy.app/RvQaecpY/raw"))() end) end
+end)
+
+createToggle("Gun Drop ESP / Teleport (ดูปืนตก)", false, function(v)
+    if v then pcall(function() loadstring(game:HttpGet("https://pastefy.app/xMuRx67R/raw"))() end) end
+end)
+
+createToggle("Kill Murderer (ยิงฆาตกรอัตโนมัติ)", false, function(v)
+    if v then pcall(function() loadstring(game:HttpGet("https://pastefy.app/LTvuZkky/raw"))() end) end
+end)
+
+-- ล็อกตำแหน่งปุ่มลอยหลัก
+local isButtonDraggable = true
+createToggle("ล็อกตำแหน่งปุ่มลอยหลัก", false, function(Value)
+    isButtonDraggable = not Value
+    CatButton.Draggable = isButtonDraggable
+end)
+
+-- ล็อกเป้าหน้าจอ & เป้าเล็งหมุน
+local isSmartAimLock = false
+createToggle("ล็อกเป้าหน้าจออัตโนมัติ (เดินอิสระ)", false, function(Value) isSmartAimLock = Value end)
+
+RunService.RenderStepped:Connect(function()
+    if isSmartAimLock then
+        pcall(function()
+            local targetChar = GetBestTarget()
+            if targetChar and targetChar:FindFirstChild("Head") then
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetChar.Head.Position)
+            end
+        end)
+    end
+end)
+
+createToggle("เป้าเล็งหมุน", false, function(Value)
+    if Value then
+        if not CoreGui:FindFirstChild("XenoCrosshairGui") then
+            local crosshairGui = Instance.new("ScreenGui", CoreGui)
+            crosshairGui.Name = "XenoCrosshairGui"
+            local crosshair = Instance.new("ImageLabel", crosshairGui)
+            crosshair.Name = "RotatingCrosshair"
+            crosshair.Size = UDim2.new(0, 40, 0, 40)
+            crosshair.AnchorPoint = Vector2.new(0.5, 0.5)
+            crosshair.Position = UDim2.new(0.5, 0, 0.5, -30)
+            crosshair.BackgroundTransparency = 1
+            crosshair.Image = "rbxassetid://5998624778"
+            RunService.RenderStepped:Connect(function(dt)
+                pcall(function() crosshair.Rotation = (crosshair.Rotation + (dt * 90)) % 360 end)
+            end)
+        else
+            CoreGui.XenoCrosshairGui.Enabled = true
+        end
+    else
+        if CoreGui:FindFirstChild("XenoCrosshairGui") then CoreGui.XenoCrosshairGui.Enabled = false end
+    end
+end)
+
+-- ระบบฟาร์มคอยน์ & การเคลื่อนไหว
+local autoFarmEnabled = false
+local farmSpeed = 30
+local farming = false
+local RoundStart, RoundEnd
+pcall(function()
+    RoundStart = ReplicatedStorage.Remotes.Gameplay.RoundStart
+    RoundEnd = ReplicatedStorage.Remotes.Gameplay.RoundEndFade
+end)
+if RoundStart then RoundStart.OnClientEvent:Connect(function() farming = true end) end
+if RoundEnd then RoundEnd.OnClientEvent:Connect(function() farming = false end) end
+
+local function GetNearestCoin()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil, math.huge end
+    local closest, dist = nil, math.huge
+    for _, m in pairs(Workspace:GetChildren()) do
+        if m:FindFirstChild("CoinContainer") then
+            for _, coin in pairs(m.CoinContainer:GetChildren()) do
+                if coin:IsA("BasePart") and coin:FindFirstChild("TouchInterest") then
+                    local d = (hrp.Position - coin.Position).Magnitude
+                    if d < dist then closest, dist = coin, d end
+                end
+            end
+        end
+    end
+    return closest, dist
+end
+
+task.spawn(function()
+    while task.wait(0.2) do
+        if autoFarmEnabled and farming then
+            pcall(function()
+                local coin, dist = GetNearestCoin()
+                local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if coin and hrp then
+                    if dist > 150 then
+                        hrp.CFrame = coin.CFrame
+                    else
+                        local tween = TweenService:Create(hrp, TweenInfo.new(dist / farmSpeed, Enum.EasingStyle.Linear), {CFrame = coin.CFrame})
+                        tween:Play()
+                        repeat task.wait() until not coin:FindFirstChild("TouchInterest") or not farming or not autoFarmEnabled or not hrp.Parent
+                        tween:Cancel()
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+createToggle("Auto Farm Coin (ความเร็ว 30 ไม่รีเซ็ต)", false, function(Value) 
+    autoFarmEnabled = Value 
+    if Value then farming = true end 
+end)
+
+local speedEnabled = false
+createToggle("เพิ่มความเร็ว (Speed 22)", false, function(Value)
+    speedEnabled = Value
+    if not Value and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = 16
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    if speedEnabled and LocalPlayer.Character then
+        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then humanoid.WalkSpeed = 22 end
+    end
+end)
+
+local infJumpEnabled = false
+createToggle("Infinite Jump", false, function(Value) infJumpEnabled = Value end)
+
+UserInputService.JumpRequest:Connect(function()
+    if infJumpEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+local noclipMapEnabled = false
+createToggle("ทะลุกำแพง", false, function(Value) noclipMapEnabled = Value end)
+
+RunService.Stepped:Connect(function()
+    if noclipMapEnabled and LocalPlayer.Character then
+        for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
+        end
+    end
+end)
+
+local noplayerNoclipEnabled = false
+createToggle("ทะลุผู้เล่นอย่างเดียว", false, function(Value) noplayerNoplayerNoclipEnabled = Value end)
+
+RunService.Stepped:Connect(function()
+    if noplayerNoclipEnabled then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character then
+                for _, part in ipairs(p.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then part.CanCollide = false end
+                end
+            end
+        end
+    end
+end)
+
+-- ==========================================
+-- 6. ปุ่มลอย "เก็บปืน" (ปรับปรุงใหม่: ค้นหาครอบคลุมทุกรูปแบบปืนตก)
+-- ==========================================
+local PullGunButton = Instance.new("TextButton")
+PullGunButton.Name = "PullGunFloatingButton"
+PullGunButton.Size = UDim2.new(0, 130, 0, 45)
+PullGunButton.Position = UDim2.new(0.80, 0, 0.45, 0)
+PullGunButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+PullGunButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+PullGunButton.TextSize = 14
+PullGunButton.Font = Enum.Font.GothamBold
+PullGunButton.Text = "เก็บปืน"
+PullGunButton.Draggable = true
+PullGunButton.Active = true
+PullGunButton.Parent = ScreenGui
+
+local ButtonCorner = Instance.new("UICorner")
+ButtonCorner.CornerRadius = UDim.new(0, 8)
+ButtonCorner.Parent = PullGunButton
+
+local RainbowGradient = Instance.new("UIGradient")
+RainbowGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 0, 0)),
+    ColorSequenceKeypoint.new(0.20, Color3.fromRGB(255, 128, 0)),
+    ColorSequenceKeypoint.new(0.40, Color3.fromRGB(255, 255, 0)),
+    ColorSequenceKeypoint.new(0.60, Color3.fromRGB(0, 255, 0)),
+    ColorSequenceKeypoint.new(0.80, Color3.fromRGB(0, 128, 255)),
+    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(128, 0, 255))
+})
+RainbowGradient.Parent = PullGunButton
+
+PullGunButton.MouseButton1Click:Connect(function()
+    task.spawn(function()
+        local character = LocalPlayer.Character
+        if character and character:FindFirstChild("HumanoidRootPart") then
+            local hrp = character.HumanoidRootPart
+            local foundGun = false
+
+            -- วนลูปค้นหาปืนตกใน Workspace ทั้งหมด (รองรับทุกเคสชื่อและรูปแบบ)
+            for _, obj in ipairs(Workspace:GetDescendants()) do
+                local nameLower = string.lower(obj.Name)
+                if nameLower == "gungun" or nameLower == "gundrop" or nameLower == "droppedgun" or nameLower == "gun" then
+                    local partToMove = nil
+                    if obj:IsA("Model") then
+                        partToMove = obj.PrimaryPart or obj:FindFirstChild("Handle") or obj:FindFirstChildWhichIsA("BasePart", true)
+                    elseif obj:IsA("BasePart") then
+                        partToMove = obj
+                    elseif obj:IsA("Tool") then
+                        partToMove = obj:FindFirstChild("Handle")
+                    end
+
+                    if partToMove then
+                        partToMove.CFrame = hrp.CFrame + Vector3.new(0, 2, 0)
+                        foundGun = true
+                    end
+                end
+            end
+
+            if foundGun then
+                PullGunButton.Text = "✅ ดึงปืนแล้ว!"
+                task.wait(1)
+                PullGunButton.Text = "เก็บปืน"
+            else
+                PullGunButton.Text = "❌ ไม่พบปืน"
+                task.wait(1)
+                PullGunButton.Text = "เก็บปืน"
+            end
+        end
+    end)
+end)
